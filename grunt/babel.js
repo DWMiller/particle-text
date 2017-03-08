@@ -1,10 +1,10 @@
 module.exports = {
-    options: {
-        sourceMap: true
+  options: {
+    sourceMap: true,
+  },
+  dist: {
+    files: {
+      'dist/app.babelfied.js': 'dist/app.js',
     },
-    dist: {
-        files: {
-            "dist/app.babelfied.js": "dist/app.js"
-        }
-    }
-}
+  },
+};
