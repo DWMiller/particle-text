@@ -1,136 +1,119 @@
-function randCoord(maxX, maxY) {
-    return {
-        x: Math.floor(Math.random() * maxX),
-        y: Math.floor(Math.random() * maxY)
-    }
-}
+function generateParticles(count) {
+  const particles = [];
 
-function randomColor() {
-    let letters = '0123456789ABCDEF'.split('');
-    let color = '#';
-    for (var i = 0; i < 6; i++) {
-        color += letters[Math.floor(Math.random() * 16)];
-    }
-    return color;
-}
+  while (particles.length < count) {
+    let pos = util.randCoord(config.w, config.h);
+    particles.push(
+      createParticle({
+        x: pos.x,
+        y: pos.y,
+        color: util.randomColor(),
+      })
+    );
+  }
 
-function generateParticles() {
-    for (var i = 0; i < particleCount; i++) {
-        let pos = randCoord(config.w, config.h);
-        particles.push(newParticle({
-            x: pos.x,
-            y: pos.y,
-            color: randomColor()
-        }));
-    }
-}
-
-function drawParticles() {
-    particles.forEach(function(particle) {
-        particle.draw(ctx);
-    })
+  return particles;
 }
 
 function render() {
-    canvasUtil.blurClear(ctx);
-    simulate();
-    drawParticles();
+  canvasUtil.blurClear(ctx);
+  simulate();
 
-    if (!done) {
-        requestAnimationFrame(render);
-    }
+  state.particles.forEach(particleDraw);
+
+  if (!state.done) {
+    window.requestAnimationFrame(render);
+  }
 }
 
-function update() {
-    canvasUtil.clear(textContext);
+function updateTextCanvas() {
+  canvasUtil.clear(textContext);
+  textContext.font = canvasUtil.shrinkTextToFit(
+    config.baseFontSize,
+    config.text,
+    config.fontFace,
+    textContext
+  );
+  textContext.fillText(config.text, config.w / 2, config.h / 2, config.w);
+  return canvasUtil.getFilledPositions(textContext);
+}
 
-    if (config.text.length === 0) {
-        disperseParticles();
-        return;
-    }
+function onTextChange() {
+  if (config.text.length === 0) {
+    disperseParticles();
+    return;
+  }
 
-    textContext.font = canvasUtil.shrinkTextToFit(config.baseFontSize, config.text, config.fontFace, textContext);
-    textContext.fillText(config.text, config.w / 2, config.h / 2, config.w);
-
-    targetParticles(textContext);
-    startSimulation();
+  const textPositions = updateTextCanvas();
+  assignTextTargets(textPositions);
+  startSimulation();
 }
 
 function startSimulation() {
-    if (done) {
-        done = false;
-        requestAnimationFrame(render);
-    }
-}
-
-function targetParticles(ctx) {
-    textPositions = canvasUtil.getTextPositions(ctx);
-    assignTextTargets();
+  state.inTransitionParticles = [...state.particles];
+  if (state.done) {
+    state.done = false;
+    render();
+  }
 }
 
 function disperseParticles() {
-    config.text = '';
-    particles.forEach(function(particle) {
-        let target = randCoord(config.w, config.h);
-        particle.setTarget(target);
-        particle.setVector(vector(particle, target));
-    })
-    startSimulation();
+  config.text = '';
+  state.particles.forEach(particle => {
+    let target = util.randCoord(config.w, config.h);
+    particle.setTarget(target);
+    particle.setVector(createVector(particle, target));
+  });
+  startSimulation();
 }
 
-function assignTextTargets() {
-    particles.forEach(function(particle) {
-        let target = textPositions[Math.floor(Math.random() * textPositions.length)];
-        particle.setTarget(target);
-        particle.setVector(vector(particle, target));
-    })
+function setInitialPositions(textPositions) {
+  state.particles.forEach(particle => {
+    const target = util.arrayRand(textPositions);
+    particle.x = target.x;
+    particle.y = target.y;
+  });
+  render();
+}
+
+function assignTextTargets(textPositions) {
+  state.particles.forEach(particle => {
+    const target = util.arrayRand(textPositions);
+    particle.setTarget(target);
+    particle.setVector(createVector(particle, target));
+  });
 }
 
 function simulate() {
-    done = true;
-    particles.forEach(function(particle) {
-        if (particle.simulate()) {
-            done = false;
-        }
-    })
+  state.inTransitionParticles = state.inTransitionParticles.filter(
+    particle => particle.target
+  );
+
+  state.inTransitionParticles.forEach(particleSimulate);
+  state.done = state.inTransitionParticles.length < 1;
 }
 
-let canvas = document.getElementById("canvas"),
-    textCanvas = document.createElement("canvas"),
-    area = config.w * config.h,
-    done = true,
-    particleCount = area * config.particleRate;
+const canvas = document.getElementById('canvas'),
+  textCanvas = document.createElement('canvas'),
+  ctx = canvas.getContext('2d'),
+  textContext = textCanvas.getContext('2d');
 
 canvas.width = config.w;
 canvas.height = config.h;
 textCanvas.width = config.w;
 textCanvas.height = config.h;
 
-let ctx = canvas.getContext('2d'),
-    textContext = textCanvas.getContext('2d'),
-    particles = [],
-    textPositions = [];
-
-textContext.fillStyle = "#FFFFFF";
-textContext.textAlign = "center";
+textContext.fillStyle = '#FFFFFF';
+textContext.textAlign = 'center';
 textContext.textBaseline = 'middle';
 
-generateParticles();
+const state = {
+  done: true,
+  particles: generateParticles(config.particleCount),
+  inTransitionParticles: [],
+};
 
-update();
+const textPositions = updateTextCanvas();
+setInitialPositions(textPositions);
 
-var gui = new dat.GUI({
-    autoPlace: false
-});
-
-var customContainer = document.getElementById('gui');
-customContainer.appendChild(gui.domElement);
-
-gui.add(config, 'text').listen().onFinishChange(update).name('Text');
-gui.add(config, 'fontFace').onFinishChange(update).name('Font');
-gui.add(config, 'baseFontSize', {
-    Small: 100,
-    Normal: 500,
-    Large: 1000
-}).name('Font Size').onFinishChange(update);
-gui.add(window, 'disperseParticles').name('Disperse');
+addGui();

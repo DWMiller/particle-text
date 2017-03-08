@@ -1,38 +1,39 @@
-let particlePrototype = {
-    x: 0,
-    y: 0,
-    r: 1,
-    color: '#FFF',
-    vector: false,
-    target: false,
-    simulate: function() {
-        if (!this.vector || !this.target) {
-            return false;
-        }
+const particlePrototype = {
+  x: 0,
+  y: 0,
+  r: 1,
+  color: '#FFF',
+  vector: false,
+  target: false,
+  setVector: function(vector) {
+    this.vector = vector;
+  },
+  setTarget: function(target) {
+    this.target = target;
+  },
+};
 
-        if (physics.hitTest(this, this.target)) {
-            this.target = false;
-            this.vector = false;
-        } else {
-            physics.move(this, this.vector);
-        }
+function particleSimulate(particle) {
+  if (!particle.vector || !particle.target) {
+    return;
+  }
 
-        return true;
-    },
-    setVector: function(vector) {
-        this.vector = vector;
-    },
-    setTarget: function(target) {
-        this.target = target;
-    },
-    draw: function draw(ctx) {
-        ctx.strokeStyle = this.color;
-        ctx.beginPath();
-        ctx.arc(this.x, this.y, this.r, 0, 2 * Math.PI);
-        ctx.stroke();
-    }
+  physics.move(particle, particle.vector);
+
+  if (physics.hitTest(particle, particle.target)) {
+    particle.target = false;
+    particle.vector = false;
+    return;
+  }
 }
 
-function newParticle(options) {
-    return _.extend(Object.create(particlePrototype), options);
+function particleDraw({ x, y, r, color }) {
+  ctx.strokeStyle = color;
+  ctx.beginPath();
+  ctx.arc(x, y, r, 0, 2 * Math.PI);
+  ctx.stroke();
+}
+
+function createParticle(options) {
+  return Object.assign(Object.create(particlePrototype), options);
 }
